@@ -1,0 +1,272 @@
+{% extends 'base.html' %}
+
+
+{% block etatactuel %}
+Tableau de bord
+{% endblock etatactuel %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <div class="btn-group col-md-2 selection"> 
+        <select name="section" class="form-select" required onchange="redirectToSection(this)">
+            <option value="{% url 'index' %}">Générale</option>
+            {% for section in sections %}
+                <option value="{% url 'graphe_section' section.id %}">{{ section.nom_section }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-2.5 btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2 buttons">
+            <a class="btn btn-info" href="{% url 'historique' %}">
+                <div class="flex-container">
+                    <i class="fa fa-history " aria-hidden="true"></i>&nbsp;&nbsp; 
+                    <span><strong>Historique</strong></span>
+                </div>
+            </a>
+        </div>
+        <div class="btn-group me-2 buttons">
+            <a class="btn btn-info" href="{% url 'prevision' %}">
+                <div class="flex-container">
+                    <i class="fa fa-line-chart" aria-hidden="true"></i> &nbsp;&nbsp;
+                    <span><strong>Prévisions</strong></span>
+                </div>
+            </a>
+        </div>
+    </div>                
+</div>
+<h3 class="separator text-center">Graphique des consommations périodique</h3>
+<div style="width: 95%; margin: 0 auto;" class="quick-access">
+    <!-- Graphiques des consommations périodique -->
+    <div class="text-center graph">
+        <h3>Aujourd'hui</h3>
+        <h3 style="color: #10b3d8;">{{daily_consommation}} m&sup3</h3>
+        <canvas id="section-daily-chart"></canvas>
+    </div>
+    <div class="text-center graph">
+        <h3 class="text-center">Cette semaine</h3>
+        <h3 style="color: #10b3d8;">{{weekly_consommation}} m&sup3</h3>
+        <canvas id="section-weekly-chart"></canvas>
+    </div>
+    <div class="text-center graph">
+        <h3 class="text-center">Ce mois</h3>
+        <h3 style="color: #10b3d8;">{{monthly_consommation}} m&sup3</h3>
+        <canvas id="section-monthly-chart"></canvas>
+    </div>
+</div><br><br>          
+<div class="quick-access">   
+    <h3 class="separator text-center">Graphique de la consommation des sept derniers jours</h3>
+    <div style="width: 95%; margin: 0 auto;" class="graph1">
+        <canvas id="myChart"></canvas>   
+    </div><br><br>   
+    <h3 class="separator text-center">Courbe sur la consommation globale</h3>
+    <div style="width: 95%; margin: 0 auto;" class="graph1">
+        <canvas id="forecastChart" width="400" height="200"></canvas>
+    </div>
+</div>
+{% endblock content %}
+
+{% block scripts %}
+<script>
+    // Fonction pour rafraîchir la page toutes les 10 secondes
+    function refreshPage() {
+        location.reload();
+    }
+
+    // Actualiser la page toutes les 20 secondes (20000 millisecondes)
+    setInterval(refreshPage, 20000);
+</script>
+<script>
+    var ctx = document.getElementById('myChart').getContext('2d');
+        var data = {
+            labels: [
+                {% for item in data %}
+                "{{ item.day|date:'SHORT_DATE_FORMAT' }}",
+                {% endfor %}
+            ],
+            datasets: [{
+                label: 'Consommation des sept derniers jours en m³',
+                data: [
+                    {% for item in data %}
+                    {{ item.quantite_sum }},
+                    {% endfor %}
+                ],
+                backgroundColor: 'lightblue',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 1
+            }]
+        };
+
+        var myChart = new Chart(ctx, {
+            type: 'bar',
+            data: data,
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+</script>
+<script>
+    var sectionDailyChart = new Chart(document.getElementById('section-daily-chart'), {
+        type: 'pie',
+        data: {
+            labels: [{% for section in sections %}"{{ section.nom_section }}",{% endfor %}],
+            datasets: [{
+                data: [{% for section in daily_consommation_section %}{{ section }},{% endfor %}],
+                backgroundColor: [
+                    '#EBC3D2',
+                    '#CDEBC3',
+                    '#8FA9DE',
+                    '#DE8F99',
+                    '#F96AAE',
+                    '#F79519',
+                    '#F719AA',
+                    '#19F799',
+                ],
+            }],
+        },
+        options: {
+            tooltips: {
+                callbacks: {
+                    label: function (tooltipItem, data) {
+                        var dataset = data.datasets[tooltipItem.datasetIndex];
+                        var currentValue = dataset.data[tooltipItem.index];
+                        var total = dataset.data.reduce(function (previousValue, currentValue) {
+                            return previousValue + currentValue;
+                        });
+                        var percentage = ((currentValue / total) * 100).toFixed(2) + '%';
+                        return percentage;
+                    },
+                },
+            },
+        },
+    });
+
+    // Configuration du graphique circulaire hebdomadaire
+    var sectionWeeklyChart = new Chart(document.getElementById('section-weekly-chart'), {
+        type: 'pie',
+        data: {
+            labels: [{% for section in sections %}"{{ section.nom_section }}",{% endfor %}],
+            datasets: [{
+                data: [{% for section in weekly_consommation_section %}{{ section }},{% endfor %}],
+                backgroundColor: [
+                    '#EBC3D2',
+                    '#CDEBC3',
+                    '#8FA9DE',
+                    '#DE8F99',
+                    '#F96AAE',
+                    '#F79519',
+                    '#F719AA',
+                    '#19F799',
+                ],
+            }],
+        },
+        options: {
+            tooltips: {
+                callbacks: {
+                    label: function (tooltipItem, data) {
+                        var dataset = data.datasets[tooltipItem.datasetIndex];
+                        var total = dataset.data.reduce(function (previousValue, currentValue) {
+                            return previousValue + currentValue;
+                        });
+                        var currentValue = dataset.data[tooltipItem.index];
+                        var percentage = Math.floor(((currentValue / total) * 100) + 0.5);
+                        return data.labels[tooltipItem.index] + ': ' + currentValue + ' m³ (' + percentage + '%)';
+                    },
+                },
+            },
+        },
+    });
+
+    // Configuration du graphique circulaire mensuel
+    var sectionMonthlyChart = new Chart(document.getElementById('section-monthly-chart'), {
+        type: 'pie',
+        data: {
+            labels: [{% for section in sections %}"{{ section.nom_section }}",{% endfor %}],
+            datasets: [{
+                data: [{% for section in monthly_consommation_section %}{{ section }},{% endfor %}],
+                backgroundColor: [
+                    '#EBC3D2',
+                    '#CDEBC3',
+                    '#8FA9DE',
+                    '#DE8F99',
+                    '#F96AAE',
+                    '#F79519',
+                    '#F719AA',
+                    '#19F799',
+                ],
+            }],
+        },
+        options: {
+            tooltips: {
+                callbacks: {
+                    label: function (tooltipItem, data) {
+                        var dataset = data.datasets[tooltipItem.datasetIndex];
+                        var total = dataset.data.reduce(function (previousValue, currentValue) {
+                            return previousValue + currentValue;
+                        });
+                        var currentValue = dataset.data[tooltipItem.index];
+                        var percentage = Math.floor(((currentValue / total) * 100) + 0.5);
+                        return data.labels[tooltipItem.index] + ': ' + currentValue + ' m³ (' + percentage + '%)';
+                    },
+                },
+            },
+        },
+    });
+</script>
+<script>
+    function redirectToSection(select) {
+        var selectedOption = select.options[select.selectedIndex];
+        var url = selectedOption.value;
+        if (url !== "") {
+            window.location.href = url;
+        }
+    }
+</script>
+<script>
+    var dates = [];
+    var rawQuantities = [];
+    {% for date, quantity in daily %}
+        dates.push("{{ date }}");
+        rawQuantities.push({{ quantity }});
+    {% endfor %}
+    // Trouver l'indice de la dernière date des données brutes
+    var lastIndex = dates.length - 1;
+    var ctx = document.getElementById('forecastChart').getContext('2d');
+    var myChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dates,
+            datasets: [
+                {
+                    label: 'Données Brutes',
+                    data: rawQuantities,
+                    borderColor: 'black',
+                    fill: true
+                },
+            ]
+        },
+        options: {
+            scales: {
+                x: {
+                    display: true,
+                    title: {
+                        display: true,
+                        text: 'Date'
+                    }
+                },
+                y: {
+                    display: true,
+                    title: {
+                        display: true,
+                        text: 'Quantité consommée'
+                    }
+                }
+            }
+        }
+    });
+</script>
+
+{% endblock scripts %}
